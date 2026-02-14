@@ -1,0 +1,1 @@
+# TiendaGenerica-Grupo10
