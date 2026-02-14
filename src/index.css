@@ -1,0 +1,30 @@
+:root{
+  --bg:#f7f7fb;
+  --card:#ffffff;
+  --accent:#2b6be6;
+  --muted:#666;
+}
+*{box-sizing:border-box}
+body{font-family:Inter,ui-sans-serif,system-ui,Arial;margin:0;background:var(--bg);color:#111}
+.app{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login,.menu{background:var(--card);padding:24px;border-radius:8px;box-shadow:0 6px 18px rgba(20,20,40,0.06);width:320px}
+.login h2,.menu h2{margin:0 0 12px 0}
+.login label{display:block;margin:8px 0;font-size:14px}
+.login input{width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:6px}
+.login button{width:100%;margin-top:12px;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:6px}
+.error{color:#c44;margin-top:8px;font-size:13px}
+
+.menu ul{padding-left:18px}
+.menu li{margin:6px 0}
+.menu button{margin-top:12px;padding:8px 12px;border-radius:6px;border:1px solid #ddd;background:white}
+
+/* Layout para sidebar */
+.menu-container{display:flex;gap:16px;align-items:flex-start;width:820px}
+.sidebar{width:220px;background:var(--card);padding:16px;border-radius:8px;box-shadow:0 6px 18px rgba(20,20,40,0.06)}
+.sidebar-header{margin-bottom:12px;font-size:14px}
+.sidebar .user{color:var(--muted);font-size:13px;margin-top:6px}
+.sidebar button{display:block;width:100%;padding:8px;margin:8px 0;border:none;border-radius:6px;background:transparent;text-align:left;cursor:pointer}
+.sidebar button:hover{background:rgba(43,107,230,0.07)}
+.sidebar button.logout{margin-top:12px;border:1px solid #ddd;background:white}
+.content{flex:1;background:var(--card);padding:18px;border-radius:8px;box-shadow:0 6px 18px rgba(20,20,40,0.04)}
+
