@@ -8,7 +8,6 @@ export default function Login({ onLogin }) {
   const submit = (e) => {
     e.preventDefault()
     const trimmed = username.trim()
-    // Validación combinada: si usuario no es 'admininicial' o la contraseña es incorrecta
     const passwordWrong = password !== '' && password !== 'admin123456'
     if (trimmed !== 'admininicial' || passwordWrong) {
       setError('Usuario o contraseña incorrecto')
