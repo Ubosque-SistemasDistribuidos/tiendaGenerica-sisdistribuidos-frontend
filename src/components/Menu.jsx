@@ -350,7 +350,7 @@ export default function Menu({ user, onLogout }) {
 
             {/* Formulario para añadir/editar información */}
             <div style={{ padding: '16px', backgroundColor: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-              <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>➕ Añadir / Editar Usuario</h4>
+              <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>Añadir / Editar Usuario</h4>
               <form>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
@@ -543,7 +543,7 @@ export default function Menu({ user, onLogout }) {
 
             {/* Formulario para añadir/editar información */}
             <div style={{ padding: '16px', backgroundColor: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-              <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>➕ Añadir / Editar Cliente</h4>
+              <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>Añadir / Editar Cliente</h4>
               <form>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
@@ -728,7 +728,7 @@ export default function Menu({ user, onLogout }) {
 
             {/* Formulario para añadir/editar información */}
             <div style={{ padding: '16px', backgroundColor: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-              <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>➕ Añadir / Editar Proveedor</h4>
+              <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>Añadir / Editar Proveedor</h4>
               <form>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
