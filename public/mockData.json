@@ -100,5 +100,25 @@
       "ciudad": "Cali",
       "direccionProveedor": "Calle 5 No. 15-25"
     }
+  ],
+  "/productos": [
+    {
+      "id": 1,
+      "codigoProducto": "PROD-001",
+      "nombreProducto": "Arroz 500g",
+      "precioCompra": 2500,
+      "ivaCompra": 0,
+      "precioVenta": 3200,
+      "nitProveedor": "123456789-1"
+    },
+    {
+      "id": 2,
+      "codigoProducto": "PROD-002",
+      "nombreProducto": "Aceite 1L",
+      "precioCompra": 8000,
+      "ivaCompra": 1520,
+      "precioVenta": 12000,
+      "nitProveedor": "987654321-9"
+    }
   ]
 }

@@ -150,6 +150,31 @@ export const apiService = {
   },
 
   /**
+   * Crear múltiples registros desde un array
+   * @param {string} endpoint - El endpoint específico
+   * @param {Array} dataArray - Array de objetos a crear
+   */
+  createBulk: async (endpoint, dataArray) => {
+    try {
+      if (USE_MOCK) {
+        return await backend.createBulk(endpoint, dataArray)
+      }
+
+      const response = await fetch(`${API_BASE_URL}${endpoint}/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataArray)
+      })
+      if (!response.ok) throw new Error(`Error ${response.status}: No se pudieron crear los registros`)
+      return await response.json()
+    } catch (error) {
+      throw new Error(`Error al crear registros masivos: ${error.message}`)
+    }
+  },
+
+  /**
    * Realizar una consulta personalizada
    * @param {string} url - URL completa o endpoint relativo
    * @param {object} options - Opciones adicionales de fetch

@@ -19,7 +19,8 @@ class MockBackend {
         localStorage.setItem(this.storageKey, JSON.stringify({
           '/usuarios': [],
           '/clientes': [],
-          '/proveedores': []
+          '/proveedores': [],
+          '/productos': []
         }))
       }
     }
@@ -162,6 +163,28 @@ class MockBackend {
     this.setData(endpoint, items)
     
     return deletedItem
+  }
+
+  // POST BULK - Crear múltiples registros
+  async createBulk(endpoint, dataArray) {
+    await this.delay()
+    const items = this.getData(endpoint)
+    let maxId = items.length > 0 ? Math.max(...items.map(i => i.id || 0)) : 0
+    const newItems = []
+
+    for (const data of dataArray) {
+      maxId++
+      const newItem = {
+        ...data,
+        id: maxId,
+        createdAt: new Date().toISOString()
+      }
+      items.push(newItem)
+      newItems.push(newItem)
+    }
+
+    this.setData(endpoint, items)
+    return newItems
   }
 
   // Limpiar todos los datos

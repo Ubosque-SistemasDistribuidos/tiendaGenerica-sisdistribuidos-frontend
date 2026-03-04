@@ -12,6 +12,9 @@ export default function Menu({ user, onLogout }) {
   const [searchError, setSearchError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [csvFile, setCsvFile] = useState(null)
+  const [csvFileName, setCsvFileName] = useState('')
+  const [uploadResults, setUploadResults] = useState(null)
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -294,6 +297,103 @@ export default function Menu({ user, onLogout }) {
       const result = await apiService.create('/usuarios', formData)
       setSearchResults([result])
       setFormData({})
+    } catch (error) {
+      setSearchError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCsvFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        setSearchError('Solo se permiten archivos CSV (.csv)')
+        setCsvFile(null)
+        setCsvFileName('')
+        e.target.value = ''
+        return
+      }
+      setCsvFile(file)
+      setCsvFileName(file.name)
+      setSearchError('')
+      setUploadResults(null)
+    }
+  }
+
+  const parseCSV = (text) => {
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '')
+    if (lines.length < 2) {
+      throw new Error('El archivo CSV debe contener al menos una fila de encabezados y una fila de datos')
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+    const requiredFields = ['codigo_producto', 'nombre_producto', 'nitproveedor', 'precio_compra', 'ivacompra', 'precio_venta']
+    const missingFields = requiredFields.filter(f => !headers.includes(f))
+
+    if (missingFields.length > 0) {
+      throw new Error(`Faltan columnas requeridas en el CSV: ${missingFields.join(', ')}`)
+    }
+
+    const products = []
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim())
+      if (values.length !== headers.length) {
+        throw new Error(`Error en la fila ${i + 1}: el número de columnas no coincide con los encabezados`)
+      }
+      const product = {}
+      headers.forEach((header, idx) => {
+        const val = values[idx]
+        // Mapear de snake_case a camelCase
+        const fieldMap = {
+          'codigo_producto': 'codigoProducto',
+          'nombre_producto': 'nombreProducto',
+          'nitproveedor': 'nitProveedor',
+          'precio_compra': 'precioCompra',
+          'ivacompra': 'ivaCompra',
+          'precio_venta': 'precioVenta'
+        }
+        const camelCaseField = fieldMap[header] || header
+        if (['precioCompra', 'ivaCompra', 'precioVenta'].includes(camelCaseField)) {
+          product[camelCaseField] = parseFloat(val) || 0
+        } else {
+          product[camelCaseField] = val
+        }
+      })
+      products.push(product)
+    }
+    return products
+  }
+
+  const handleCargarCSV = async () => {
+    if (!csvFile) {
+      setSearchError('Por favor seleccione un archivo CSV')
+      return
+    }
+
+    setLoading(true)
+    setSearchError('')
+    setUploadResults(null)
+
+    try {
+      const text = await csvFile.text()
+      const products = parseCSV(text)
+
+      if (products.length === 0) {
+        throw new Error('El archivo CSV no contiene productos para cargar')
+      }
+
+      const result = await apiService.createBulk('/productos', products)
+      setUploadResults({
+        success: true,
+        count: result.length,
+        products: result
+      })
+      setCsvFile(null)
+      setCsvFileName('')
+      // Limpiar el input file
+      const fileInput = document.getElementById('csv-file-input')
+      if (fileInput) fileInput.value = ''
     } catch (error) {
       setSearchError(error.message)
     } finally {
@@ -876,6 +976,110 @@ export default function Menu({ user, onLogout }) {
             )}
           </div>
         )
+      case 'productos':
+        return (
+          <div>
+            <h3>Gestión de productos</h3>
+
+            <div style={{ padding: '24px', backgroundColor: '#f9f9f9', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+              <h4 style={{ margin: '0 0 20px 0', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>Cargar Productos desde CSV</h4>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                <label style={{ fontSize: '13px', color: '#666', whiteSpace: 'nowrap', minWidth: '120px' }}>Nombre del Archivo</label>
+                <input 
+                  type="text" 
+                  value={csvFileName}
+                  readOnly
+                  placeholder="Ningún archivo seleccionado"
+                  style={{ flex: 1, padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', backgroundColor: '#fff' }}
+                />
+                <input 
+                  type="file" 
+                  id="csv-file-input"
+                  accept=".csv"
+                  onChange={handleCsvFileSelect}
+                  style={{ display: 'none' }}
+                />
+                <button 
+                  type="button" 
+                  className="form-button"
+                  onClick={() => document.getElementById('csv-file-input').click()}
+                >
+                  Examinar
+                </button>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                <button 
+                  type="button" 
+                  className="form-button csv-upload-btn"
+                  onClick={handleCargarCSV}
+                  disabled={loading || !csvFile}
+                >
+                  {loading ? 'Cargando...' : 'Cargar'}
+                </button>
+              </div>
+
+              <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#e8f4f8', borderRadius: '6px', fontSize: '12px', color: '#555' }}>
+                <strong>Formato esperado del CSV:</strong><br />
+                El archivo debe incluir las columnas en este orden: <code>codigo_producto, nombre_producto, nitproveedor, precio_compra, ivacompra, precio_venta</code>
+              </div>
+            </div>
+
+            {searchError && (
+              <div style={{ color: '#c44', marginTop: '12px', padding: '12px', backgroundColor: '#f8d7da', borderRadius: '6px' }}>
+                Error: {searchError}
+              </div>
+            )}
+
+            {uploadResults && uploadResults.success && (
+              <div style={{ marginTop: '24px' }}>
+                <div style={{ padding: '12px', backgroundColor: '#d4edda', borderRadius: '6px', color: '#155724', marginBottom: '16px' }}>
+                  Se cargaron exitosamente <strong>{uploadResults.count}</strong> producto(s) desde el archivo CSV.
+                </div>
+
+                <div style={{ overflowX: 'auto', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                  <table className="users-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '12%' }}>Código</th>
+                        <th style={{ width: '22%' }}>Nombre</th>
+                        <th style={{ width: '14%' }}>P. Compra</th>
+                        <th style={{ width: '12%' }}>IVA</th>
+                        <th style={{ width: '14%' }}>P. Venta</th>
+                        <th style={{ width: '16%' }}>NIT Proveedor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uploadResults.products.map((prod, idx) => (
+                        <tr key={prod.id || idx} className="users-table-row">
+                          <td className="cell-cedula">
+                            <span className="badge-cedula">{prod.codigoProducto}</span>
+                          </td>
+                          <td className="cell-nombre">
+                            <strong>{prod.nombreProducto}</strong>
+                          </td>
+                          <td style={{ color: '#666', fontSize: '13px' }}>
+                            ${prod.precioCompra?.toLocaleString()}
+                          </td>
+                          <td style={{ color: '#666', fontSize: '13px' }}>
+                            ${prod.ivaCompra?.toLocaleString()}
+                          </td>
+                          <td style={{ color: '#2d6a1f', fontSize: '13px', fontWeight: '600' }}>
+                            ${prod.precioVenta?.toLocaleString()}
+                          </td>
+                          <td style={{ color: '#666', fontSize: '13px' }}>
+                            {prod.nitProveedor}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )
       default:
         return (
           <div>
@@ -897,6 +1101,7 @@ export default function Menu({ user, onLogout }) {
         <button onClick={() => setView('usuarios')}>Gestión de usuarios</button>
         <button onClick={() => setView('clientes')}>Gestión de clientes</button>
         <button onClick={() => setView('proveedores')}>Gestión de proveedores</button>
+        <button onClick={() => setView('productos')}>Gestión de productos</button>
         <button className="logout" onClick={onLogout}>Cerrar sesión</button>
       </aside>
       <main className="content">{renderContent()}</main>
