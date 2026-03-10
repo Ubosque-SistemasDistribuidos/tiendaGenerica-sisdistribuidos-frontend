@@ -1,9 +1,142 @@
+import axios from 'axios'
 import { mockBackend } from './mockBackend'
 
 // Usar VITE_USE_MOCK_BACKEND=true para usar datos locales
 // O VITE_USE_MOCK_BACKEND=false para usar el backend real
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_BACKEND === 'true'
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_BACKEND === 'false'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8088'
+const LOCAL_SALES_KEY = 'ventasFallbackLocal'
+
+const http = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  timeout: 15000
+})
+
+const normalizeEndpoint = (endpoint = '') => {
+  if (!endpoint) return ''
+  return endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+}
+
+const resolveResourcePath = (endpoint = '') => {
+  const normalized = normalizeEndpoint(endpoint)
+  const aliases = {
+    '/clientes': '/cliente',
+    '/cliente': '/cliente',
+    '/proveedores': '/proveedores',
+    '/usuarios': '/usuarios',
+    '/ventas': '/ventas',
+    '/venta': '/venta'
+  }
+  return aliases[normalized] || normalized
+}
+
+const saveSaleLocally = (salePayload = {}) => {
+  if (typeof window === 'undefined') {
+    return {
+      ...salePayload,
+      id: `LOCAL-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      persistedLocally: true
+    }
+  }
+
+  const localSales = JSON.parse(localStorage.getItem(LOCAL_SALES_KEY) || '[]')
+  const sale = {
+    ...salePayload,
+    id: `LOCAL-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    persistedLocally: true
+  }
+  localSales.push(sale)
+  localStorage.setItem(LOCAL_SALES_KEY, JSON.stringify(localSales))
+  return sale
+}
+
+const mapSearchField = (endpoint = '', searchField = '') => {
+  const resource = resolveResourcePath(endpoint)
+
+  if (resource === '/cliente') {
+    if (searchField === 'cedulaCliente') return 'cedula'
+    if (searchField === 'nombreCliente') return 'nombre'
+  }
+
+  if (resource === '/proveedores') {
+    if (searchField === 'nit') return 'nitProveedor'
+  }
+
+  return searchField
+}
+
+const mapDataToBackend = (endpoint = '', data = {}) => {
+  const resource = resolveResourcePath(endpoint)
+
+  if (resource === '/cliente') {
+    return {
+      cedula: data.cedula ?? data.cedulaCliente,
+      nombre: data.nombre ?? data.nombreCliente,
+      direccion: data.direccion ?? data.direccionCliente,
+      email: data.email ?? data.emailCliente ?? data.correo,
+      telefono: data.telefono ?? data.telefonoCliente
+    }
+  }
+
+  if (resource === '/proveedores') {
+    return {
+      nitProveedor: data.nitProveedor ?? data.nit,
+      nombreProveedor: data.nombreProveedor,
+      ciudadProveedor: data.ciudadProveedor ?? data.ciudad,
+      direccionProveedor: data.direccionProveedor,
+      telefonoProveedor: data.telefonoProveedor
+    }
+  }
+
+  return data
+}
+
+const mapDataFromBackend = (endpoint = '', data) => {
+  if (Array.isArray(data)) {
+    return data.map(item => mapDataFromBackend(endpoint, item))
+  }
+
+  if (!data || typeof data !== 'object') {
+    return data
+  }
+
+  const resource = resolveResourcePath(endpoint)
+
+  if (resource === '/cliente') {
+    return {
+      ...data,
+      id: data.id ?? data.cedula,
+      cedulaCliente: data.cedula,
+      nombreCliente: data.nombre,
+      direccionCliente: data.direccion,
+      emailCliente: data.email,
+      telefonoCliente: data.telefono
+    }
+  }
+
+  if (resource === '/proveedores') {
+    return {
+      ...data,
+      id: data.id ?? data.nitProveedor,
+      nit: data.nitProveedor,
+      ciudad: data.ciudadProveedor
+    }
+  }
+
+  return data
+}
+
+const getErrorMessage = (error, fallback) => {
+  const apiMessage = error?.response?.data?.message || error?.response?.data?.error
+  if (apiMessage) return apiMessage
+  if (error?.code === 'ECONNABORTED') return 'Tiempo de espera agotado al conectar con el backend'
+  return `${fallback}: ${error.message}`
+}
 
 // Log de conexión para debugging
 if (typeof window !== 'undefined') {
@@ -25,14 +158,12 @@ export const apiService = {
       if (USE_MOCK) {
         return await backend.getAll(endpoint, params)
       }
-      
-      const queryString = new URLSearchParams(params).toString()
-      const url = `${API_BASE_URL}${endpoint}${queryString ? '?' + queryString : ''}`
-      const response = await fetch(url)
-      if (!response.ok) throw new Error(`Error ${response.status}: No se pudieron cargar los datos`)
-      return await response.json()
+
+      const resource = resolveResourcePath(endpoint)
+      const response = await http.get(`${resource}/listar`, { params })
+      return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
-      throw new Error(`Error al obtener datos: ${error.message}`)
+      throw new Error(getErrorMessage(error, 'Error al obtener datos'))
     }
   },
 
@@ -47,11 +178,11 @@ export const apiService = {
         return await backend.getById(endpoint, id)
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}/${id}`)
-      if (!response.ok) throw new Error(`Error ${response.status}: Registro no encontrado`)
-      return await response.json()
+      const resource = resolveResourcePath(endpoint)
+      const response = await http.get(`${resource}/buscar/${id}`)
+      return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
-      throw new Error(`Error al obtener registro: ${error.message}`)
+      throw new Error(getErrorMessage(error, 'Error al obtener registro'))
     }
   },
 
@@ -67,10 +198,19 @@ export const apiService = {
         return await backend.search(endpoint, query, searchField)
       }
 
-      const params = { [searchField]: query }
-      return await apiService.getAll(endpoint, params)
+      const list = await apiService.getAll(endpoint)
+      const field = mapSearchField(endpoint, searchField)
+      const queryValue = String(query ?? '').toLowerCase()
+
+      if (!queryValue) return list
+      if (!Array.isArray(list)) return []
+
+      return list.filter((item) => {
+        const value = String(item?.[field] ?? '').toLowerCase()
+        return value.includes(queryValue)
+      })
     } catch (error) {
-      throw new Error(`Error en búsqueda: ${error.message}`)
+      throw new Error(getErrorMessage(error, 'Error en búsqueda'))
     }
   },
 
@@ -85,17 +225,12 @@ export const apiService = {
         return await backend.create(endpoint, data)
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
-      })
-      if (!response.ok) throw new Error(`Error ${response.status}: No se pudo crear el registro`)
-      return await response.json()
+      const resource = resolveResourcePath(endpoint)
+      const payload = mapDataToBackend(endpoint, data)
+      const response = await http.post(`${resource}/guardar`, payload)
+      return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
-      throw new Error(`Error al crear registro: ${error.message}`)
+      throw new Error(getErrorMessage(error, 'Error al crear registro'))
     }
   },
 
@@ -111,17 +246,12 @@ export const apiService = {
         return await backend.update(endpoint, id, data)
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
-      })
-      if (!response.ok) throw new Error(`Error ${response.status}: No se pudo actualizar el registro`)
-      return await response.json()
+      const resource = resolveResourcePath(endpoint)
+      const payload = mapDataToBackend(endpoint, data)
+      const response = await http.put(`${resource}/actualizar/${id}`, payload)
+      return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
-      throw new Error(`Error al actualizar registro: ${error.message}`)
+      throw new Error(getErrorMessage(error, 'Error al actualizar registro'))
     }
   },
 
@@ -136,16 +266,11 @@ export const apiService = {
         return await backend.delete(endpoint, id)
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-      if (!response.ok) throw new Error(`Error ${response.status}: No se pudo eliminar el registro`)
-      return await response.json()
+      const resource = resolveResourcePath(endpoint)
+      const response = await http.delete(`${resource}/eliminar/${id}`)
+      return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
-      throw new Error(`Error al eliminar registro: ${error.message}`)
+      throw new Error(getErrorMessage(error, 'Error al eliminar registro'))
     }
   },
 
@@ -160,17 +285,16 @@ export const apiService = {
         return await backend.createBulk(endpoint, dataArray)
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}/bulk`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataArray)
-      })
-      if (!response.ok) throw new Error(`Error ${response.status}: No se pudieron crear los registros`)
-      return await response.json()
+      const results = []
+
+      for (const row of dataArray) {
+        const created = await apiService.create(endpoint, row)
+        results.push(created)
+      }
+
+      return results
     } catch (error) {
-      throw new Error(`Error al crear registros masivos: ${error.message}`)
+      throw new Error(getErrorMessage(error, 'Error al crear registros masivos'))
     }
   },
 
@@ -185,12 +309,62 @@ export const apiService = {
         throw new Error('Operación personalizada no disponible en modo mock')
       }
 
-      const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`
-      const response = await fetch(fullUrl, options)
-      if (!response.ok) throw new Error(`Error ${response.status}`)
-      return await response.json()
+      const method = (options.method || 'GET').toLowerCase()
+      const data = options.body ? JSON.parse(options.body) : options.data
+      const params = options.params
+      const fullPath = url.startsWith('http') ? url : normalizeEndpoint(url)
+      const response = await http.request({
+        url: fullPath,
+        method,
+        data,
+        params,
+        headers: options.headers
+      })
+      return response.data
     } catch (error) {
-      throw new Error(`Error en consulta personalizada: ${error.message}`)
+      throw new Error(getErrorMessage(error, 'Error en consulta personalizada'))
+    }
+  },
+
+  /**
+   * Registrar una venta con sus detalles.
+   * Si el endpoint no existe en backend, se guarda en localStorage como respaldo.
+   * @param {object} data - Venta con cliente, totales y detalle de productos.
+   */
+  createSale: async (data) => {
+    try {
+      if (USE_MOCK) {
+        return await backend.create('/ventas', data)
+      }
+
+      const candidatePaths = ['/ventas/guardar', '/venta/guardar']
+      let firstNon404Error = null
+
+      for (const path of candidatePaths) {
+        try {
+          const response = await http.post(path, data)
+          return response.data
+        } catch (error) {
+          const status = error?.response?.status
+          if (status === 404 || status === 405) {
+            continue
+          }
+          firstNon404Error = error
+          break
+        }
+      }
+
+      if (firstNon404Error) {
+        throw firstNon404Error
+      }
+
+      const localSale = saveSaleLocally(data)
+      return {
+        ...localSale,
+        warning: 'La venta se guardo localmente porque el endpoint de ventas no esta disponible.'
+      }
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Error al registrar venta'))
     }
   }
 }

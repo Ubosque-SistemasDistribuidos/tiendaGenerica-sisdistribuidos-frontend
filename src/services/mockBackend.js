@@ -20,7 +20,8 @@ class MockBackend {
           '/usuarios': [],
           '/clientes': [],
           '/proveedores': [],
-          '/productos': []
+          '/productos': [],
+          '/ventas': []
         }))
       }
     }

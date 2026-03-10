@@ -15,6 +15,28 @@ export default function Menu({ user, onLogout }) {
   const [csvFile, setCsvFile] = useState(null)
   const [csvFileName, setCsvFileName] = useState('')
   const [uploadResults, setUploadResults] = useState(null)
+  const [ventaCedula, setVentaCedula] = useState('')
+  const [ventaCliente, setVentaCliente] = useState(null)
+  const [ventaFilas, setVentaFilas] = useState([
+    { id: 1, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false },
+    { id: 2, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false },
+    { id: 3, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false }
+  ])
+  const [ventaError, setVentaError] = useState('')
+  const [ventaSuccess, setVentaSuccess] = useState('')
+  const [confirmandoVenta, setConfirmandoVenta] = useState(false)
+
+  const IVA_RATE = 0.19
+
+  const formatCurrency = (value) => {
+    const amount = Number(value || 0)
+    return amount.toLocaleString('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    })
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -398,6 +420,156 @@ export default function Menu({ user, onLogout }) {
       setSearchError(error.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const resetVentaForm = () => {
+    setVentaCedula('')
+    setVentaCliente(null)
+    setVentaFilas([
+      { id: 1, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false },
+      { id: 2, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false },
+      { id: 3, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false }
+    ])
+    setVentaError('')
+    setVentaSuccess('')
+  }
+
+  const handleConsultarClienteVenta = async () => {
+    if (!ventaCedula || !ventaCedula.trim()) {
+      setVentaError('Ingrese la cedula del cliente para consultar.')
+      return
+    }
+
+    setLoading(true)
+    setVentaError('')
+    setVentaSuccess('')
+
+    try {
+      const cliente = await apiService.getById('/clientes', ventaCedula.trim())
+      setVentaCliente(cliente)
+    } catch (error) {
+      setVentaCliente(null)
+      setVentaError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getVentaFilaTotal = (fila) => {
+    const cantidad = Number(fila.cantidad || 0)
+    const precio = Number(fila.precio || 0)
+    return cantidad > 0 && precio > 0 ? cantidad * precio : 0
+  }
+
+  const updateVentaFila = (index, data) => {
+    setVentaFilas((prev) => {
+      const updated = [...prev]
+      const nextRow = { ...updated[index], ...data }
+      nextRow.total = getVentaFilaTotal(nextRow)
+      updated[index] = nextRow
+      return updated
+    })
+  }
+
+  const handleVentaCantidadChange = (index, value) => {
+    updateVentaFila(index, { cantidad: value })
+    setVentaError('')
+    setVentaSuccess('')
+  }
+
+  const handleVentaCodigoChange = (index, value) => {
+    updateVentaFila(index, { codigo: value, nombre: '', precio: 0 })
+    setVentaError('')
+    setVentaSuccess('')
+  }
+
+  const handleConsultarProductoVenta = async (index) => {
+    const fila = ventaFilas[index]
+    const codigo = fila?.codigo?.trim()
+
+    if (!codigo) {
+      setVentaError(`Ingrese el codigo del producto ${index + 1}.`)
+      return
+    }
+
+    setVentaError('')
+    setVentaSuccess('')
+    updateVentaFila(index, { cargando: true })
+
+    try {
+      const producto = await apiService.getById('/productos', codigo)
+      const precioVenta = Number(producto?.precioVenta || 0)
+
+      updateVentaFila(index, {
+        codigo,
+        nombre: producto?.nombreProducto || `Producto ${codigo}`,
+        precio: precioVenta,
+        cargando: false
+      })
+    } catch (error) {
+      updateVentaFila(index, { cargando: false, nombre: '', precio: 0, total: 0 })
+      setVentaError(error.message)
+    }
+  }
+
+  const calcularTotalesVenta = () => {
+    const subtotal = ventaFilas.reduce((acc, fila) => acc + Number(fila.total || 0), 0)
+    const iva = subtotal * IVA_RATE
+    const totalConIva = subtotal + iva
+    return { subtotal, iva, totalConIva }
+  }
+
+  const handleConfirmarVenta = async () => {
+    if (!ventaCliente) {
+      setVentaError('Debe consultar y seleccionar un cliente para registrar la venta.')
+      return
+    }
+
+    const filasValidas = ventaFilas.filter((fila) => Number(fila.cantidad) > 0 && Number(fila.precio) > 0)
+    if (filasValidas.length === 0) {
+      setVentaError('Debe agregar al menos un producto con cantidad y precio validos.')
+      return
+    }
+
+    const { subtotal, iva, totalConIva } = calcularTotalesVenta()
+    const payload = {
+      cliente: {
+        cedula: ventaCliente?.cedulaCliente || ventaCliente?.cedula
+      },
+      detalle: filasValidas.map((fila) => ({
+        codigoProducto: Number(fila.codigo),
+        cantidadProducto: Number(fila.cantidad),
+        valorVenta: Number(fila.precio),
+        valorTotal: Number(fila.total)
+      })),
+      valorVenta: subtotal,
+      ivaVenta: iva,
+      totalVenta: totalConIva
+    }
+
+    setConfirmandoVenta(true)
+    setVentaError('')
+    setVentaSuccess('')
+
+    try {
+      const response = await apiService.createSale(payload)
+      const saleId = response?.id || 'N/A'
+      const localWarning = response?.persistedLocally
+        ? ' (guardada localmente en frontend)'
+        : ''
+      setVentaSuccess(`Venta confirmada con ID ${saleId}${localWarning}.`)
+      setVentaFilas([
+        { id: 1, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false },
+        { id: 2, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false },
+        { id: 3, codigo: '', nombre: '', cantidad: '', precio: 0, total: 0, cargando: false }
+      ])
+      setVentaCedula('')
+      setVentaCliente(null)
+    } catch (error) {
+      setVentaError(error.message)
+    } finally {
+      setConfirmandoVenta(false)
     }
   }
 
@@ -862,8 +1034,8 @@ export default function Menu({ user, onLogout }) {
                   <label>Ciudad</label>
                   <input 
                     type="text" 
-                    name="ciudad" 
-                    value={formData.ciudad || ''}
+                    name="ciudadProveedor" 
+                    value={formData.ciudadProveedor || formData.ciudad || ''}
                     onChange={handleInputChange}
                   />
                 </div>
@@ -942,7 +1114,7 @@ export default function Menu({ user, onLogout }) {
                             {result.telefonoProveedor || '—'}
                           </td>
                           <td style={{ color: '#666', fontSize: '13px' }}>
-                            {result.ciudad || '—'}
+                            {result.ciudadProveedor || result.ciudad || '—'}
                           </td>
                           <td style={{ color: '#666', fontSize: '13px' }}>
                             {result.direccionProveedor || '—'}
@@ -960,7 +1132,7 @@ export default function Menu({ user, onLogout }) {
                               type="button"
                               className="action-btn view-btn"
                               onClick={() => {
-                                alert(`Detalles de ${result.nombreProveedor}:\n\nNIT: ${result.nit}\nTeléfono: ${result.telefonoProveedor}\nCiudad: ${result.ciudad}\nDirección: ${result.direccionProveedor}`)
+                                alert(`Detalles de ${result.nombreProveedor}:\n\nNIT: ${result.nit}\nTeléfono: ${result.telefonoProveedor}\nCiudad: ${result.ciudadProveedor || result.ciudad}\nDirección: ${result.direccionProveedor}`)
                               }}
                               title="Ver detalles"
                             >
@@ -1069,7 +1241,9 @@ export default function Menu({ user, onLogout }) {
                             ${prod.precioVenta?.toLocaleString()}
                           </td>
                           <td style={{ color: '#666', fontSize: '13px' }}>
-                            {prod.nitProveedor}
+                            {typeof prod.nitProveedor === 'object'
+                              ? prod.nitProveedor?.nitProveedor
+                              : prod.nitProveedor}
                           </td>
                         </tr>
                       ))}
@@ -1080,6 +1254,145 @@ export default function Menu({ user, onLogout }) {
             )}
           </div>
         )
+      case 'ventas': {
+        const { subtotal, iva, totalConIva } = calcularTotalesVenta()
+
+        return (
+          <div>
+            <h3>Registro de ventas</h3>
+
+            <div className="ventas-panel">
+              <div className="ventas-cliente-row">
+                <div className="ventas-field ventas-cedula-field">
+                  <label>Cedula</label>
+                  <input
+                    type="text"
+                    value={ventaCedula}
+                    onChange={(e) => setVentaCedula(e.target.value)}
+                    placeholder="Ingrese cedula del cliente"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="form-button"
+                  onClick={handleConsultarClienteVenta}
+                  disabled={loading}
+                >
+                  {loading ? 'Consultando...' : 'Consultar'}
+                </button>
+                <div className="ventas-field ventas-cliente-info">
+                  <label>Cliente</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={ventaCliente?.nombreCliente || ventaCliente?.nombre || ''}
+                    placeholder="Sin cliente seleccionado"
+                  />
+                </div>
+              </div>
+
+              <div className="ventas-table-wrap">
+                <table className="ventas-table">
+                  <thead>
+                    <tr>
+                      <th>Cod. Producto</th>
+                      <th>Accion</th>
+                      <th>Nombre Producto</th>
+                      <th>Cant.</th>
+                      <th>Vlr. Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ventaFilas.map((fila, index) => (
+                      <tr key={fila.id}>
+                        <td>
+                          <input
+                            type="text"
+                            value={fila.codigo}
+                            onChange={(e) => handleVentaCodigoChange(index, e.target.value)}
+                            placeholder={`Cod ${index + 1}`}
+                          />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="form-button ventas-consultar-btn"
+                            onClick={() => handleConsultarProductoVenta(index)}
+                            disabled={fila.cargando}
+                          >
+                            {fila.cargando ? '...' : 'Consultar'}
+                          </button>
+                        </td>
+                        <td>
+                          <input type="text" readOnly value={fila.nombre} placeholder="Nombre" />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            value={fila.cantidad}
+                            onChange={(e) => handleVentaCantidadChange(index, e.target.value)}
+                            placeholder="0"
+                          />
+                        </td>
+                        <td>
+                          <input type="text" readOnly value={formatCurrency(fila.total)} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="ventas-totales">
+                <div>
+                  <span>Total Venta</span>
+                  <strong>{formatCurrency(subtotal)}</strong>
+                </div>
+                <div>
+                  <span>Total IVA</span>
+                  <strong>{formatCurrency(iva)}</strong>
+                </div>
+                <div>
+                  <span>Total con IVA</span>
+                  <strong>{formatCurrency(totalConIva)}</strong>
+                </div>
+              </div>
+
+              <div className="ventas-actions">
+                <button
+                  type="button"
+                  className="form-button"
+                  onClick={handleConfirmarVenta}
+                  disabled={confirmandoVenta}
+                >
+                  {confirmandoVenta ? 'Confirmando...' : 'Confirmar'}
+                </button>
+                <button
+                  type="button"
+                  className="form-button"
+                  onClick={resetVentaForm}
+                  disabled={confirmandoVenta}
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+
+            {ventaError && (
+              <div style={{ color: '#c44', marginTop: '12px', padding: '12px', backgroundColor: '#f8d7da', borderRadius: '6px' }}>
+                Error: {ventaError}
+              </div>
+            )}
+
+            {ventaSuccess && (
+              <div style={{ color: '#155724', marginTop: '12px', padding: '12px', backgroundColor: '#d4edda', borderRadius: '6px' }}>
+                {ventaSuccess}
+              </div>
+            )}
+          </div>
+        )
+      }
       default:
         return (
           <div>
@@ -1102,6 +1415,7 @@ export default function Menu({ user, onLogout }) {
         <button onClick={() => setView('clientes')}>Gestión de clientes</button>
         <button onClick={() => setView('proveedores')}>Gestión de proveedores</button>
         <button onClick={() => setView('productos')}>Gestión de productos</button>
+        <button onClick={() => setView('ventas')}>Ventas</button>
         <button className="logout" onClick={onLogout}>Cerrar sesión</button>
       </aside>
       <main className="content">{renderContent()}</main>

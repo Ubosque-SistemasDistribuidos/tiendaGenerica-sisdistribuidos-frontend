@@ -64,3 +64,30 @@ body{font-family:Inter,ui-sans-serif,system-ui,Arial;margin:0;background:var(--b
 /* CSV Upload button */
 .csv-upload-btn{padding:10px 32px !important;font-size:14px !important;background:#8b8b8b;border-radius:6px}
 
+/* Ventas */
+.ventas-panel{padding:16px;background:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px}
+.ventas-cliente-row{display:grid;grid-template-columns:220px auto 1fr;gap:10px;align-items:end;margin-bottom:16px}
+.ventas-field label{display:block;font-size:13px;color:#666;margin-bottom:6px}
+.ventas-field input{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;background:#fff}
+.ventas-cliente-info input{background:#f5f5f5}
+.ventas-table-wrap{overflow-x:auto}
+.ventas-table{width:100%;border-collapse:separate;border-spacing:0 8px}
+.ventas-table th{font-size:12px;color:#666;text-align:left;padding:0 6px 6px 6px}
+.ventas-table td{padding:0 6px}
+.ventas-table input{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px}
+.ventas-consultar-btn{padding:8px 10px;white-space:nowrap}
+.ventas-totales{display:flex;gap:16px;justify-content:flex-end;margin-top:16px}
+.ventas-totales div{min-width:170px;background:#fff;padding:10px 12px;border-radius:6px;border:1px solid #e5e5e5}
+.ventas-totales span{display:block;font-size:12px;color:#666;margin-bottom:4px}
+.ventas-totales strong{font-size:14px;color:#333}
+.ventas-actions{display:flex;gap:8px;justify-content:center;margin-top:18px}
+
+@media (max-width: 960px){
+  .menu-container{flex-direction:column;width:100%}
+  .sidebar{width:100%}
+  .content{width:100%}
+  .ventas-cliente-row{grid-template-columns:1fr;align-items:stretch}
+  .ventas-totales{flex-direction:column;align-items:stretch}
+  .ventas-totales div{min-width:auto}
+}
+
