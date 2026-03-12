@@ -7,6 +7,50 @@ class MockBackend {
     this.initializeData()
   }
 
+  toLongNumber(value) {
+    if (value === undefined || value === null || value === '') return value
+
+    if (typeof value === 'number') {
+      return Number.isSafeInteger(value) ? value : value
+    }
+
+    const normalizedValue = String(value).trim()
+
+    if (!/^\d+$/.test(normalizedValue)) {
+      return value
+    }
+
+    const parsedValue = Number(normalizedValue)
+    return Number.isSafeInteger(parsedValue) ? parsedValue : value
+  }
+
+  normalizeRecord(endpoint, data = {}) {
+    if (endpoint !== '/clientes') {
+      return data
+    }
+
+    if ('cedula' in data) {
+      return {
+        ...data,
+        cedula: this.toLongNumber(data.cedula)
+      }
+    }
+
+    if ('cedulaCliente' in data) {
+      return {
+        ...data,
+        cedulaCliente: this.toLongNumber(data.cedulaCliente)
+      }
+    }
+
+    return data
+  }
+
+  matchesIdentifier(item, id) {
+    const identifier = item.cedula ?? item.cedulaCliente ?? item.nit ?? item.nitProveedor
+    return item.id == id || String(identifier ?? '') === String(id)
+  }
+
   async initializeData() {
     // Si no hay datos, cargar desde mockData.json
     if (!localStorage.getItem(this.storageKey)) {
@@ -71,11 +115,7 @@ class MockBackend {
   async getById(endpoint, id) {
     await this.delay()
     const data = this.getData(endpoint)
-    const item = data.find(item => 
-      item.id == id || 
-      item.cedula === id || 
-      item.nit === id
-    )
+    const item = data.find(item => this.matchesIdentifier(item, id))
     
     if (!item) {
       throw new Error('Registro no encontrado')
@@ -106,7 +146,7 @@ class MockBackend {
     const newId = items.length > 0 ? Math.max(...items.map(i => i.id || 0)) + 1 : 1
     
     const newItem = {
-      ...data,
+      ...this.normalizeRecord(endpoint, data),
       id: newId,
       createdAt: new Date().toISOString()
     }
@@ -122,11 +162,7 @@ class MockBackend {
     await this.delay()
     const items = this.getData(endpoint)
     
-    const index = items.findIndex(item => 
-      item.id == id || 
-      item.cedula === id || 
-      item.nit === id
-    )
+    const index = items.findIndex(item => this.matchesIdentifier(item, id))
     
     if (index === -1) {
       throw new Error('Registro no encontrado para actualizar')
@@ -134,7 +170,7 @@ class MockBackend {
     
     const updatedItem = {
       ...items[index],
-      ...data,
+      ...this.normalizeRecord(endpoint, data),
       updatedAt: new Date().toISOString()
     }
     
@@ -149,11 +185,7 @@ class MockBackend {
     await this.delay()
     const items = this.getData(endpoint)
     
-    const index = items.findIndex(item => 
-      item.id == id || 
-      item.cedula === id || 
-      item.nit === id
-    )
+    const index = items.findIndex(item => this.matchesIdentifier(item, id))
     
     if (index === -1) {
       throw new Error('Registro no encontrado para eliminar')
@@ -176,7 +208,7 @@ class MockBackend {
     for (const data of dataArray) {
       maxId++
       const newItem = {
-        ...data,
+        ...this.normalizeRecord(endpoint, data),
         id: maxId,
         createdAt: new Date().toISOString()
       }

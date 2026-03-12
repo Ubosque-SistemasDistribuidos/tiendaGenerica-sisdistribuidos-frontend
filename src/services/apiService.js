@@ -55,6 +55,33 @@ const saveSaleLocally = (salePayload = {}) => {
   return sale
 }
 
+const toLongNumber = (value) => {
+  if (value === undefined || value === null || value === '') return value
+
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) ? value : value
+  }
+
+  const normalizedValue = String(value).trim()
+
+  if (!/^\d+$/.test(normalizedValue)) {
+    return value
+  }
+
+  const parsedValue = Number(normalizedValue)
+  return Number.isSafeInteger(parsedValue) ? parsedValue : value
+}
+
+const normalizeResourceId = (endpoint = '', id) => {
+  const resource = resolveResourcePath(endpoint)
+
+  if (resource === '/cliente') {
+    return toLongNumber(id)
+  }
+
+  return id
+}
+
 const mapSearchField = (endpoint = '', searchField = '') => {
   const resource = resolveResourcePath(endpoint)
 
@@ -74,13 +101,18 @@ const mapDataToBackend = (endpoint = '', data = {}) => {
   const resource = resolveResourcePath(endpoint)
 
   if (resource === '/cliente') {
-    return {
-      cedula: data.cedula ?? data.cedulaCliente,
+    const cedulaValue = toLongNumber(data.cedula ?? data.cedulaCliente)
+    const payload = {
+      cedula: toLongNumber(data.cedula ?? data.cedulaCliente),
       nombre: data.nombre ?? data.nombreCliente,
       direccion: data.direccion ?? data.direccionCliente,
       email: data.email ?? data.emailCliente ?? data.correo,
       telefono: data.telefono ?? data.telefonoCliente
     }
+    if (cedulaValue != null && cedulaValue !== '') {
+    payload.cedula = cedulaValue
+    }
+    return payload
   }
 
   if (resource === '/proveedores') {
@@ -111,7 +143,7 @@ const mapDataFromBackend = (endpoint = '', data) => {
     return {
       ...data,
       id: data.id ?? data.cedula,
-      cedulaCliente: data.cedula,
+      cedulaCliente: toLongNumber(data.cedula),
       nombreCliente: data.nombre,
       direccionCliente: data.direccion,
       emailCliente: data.email,
@@ -179,7 +211,8 @@ export const apiService = {
       }
 
       const resource = resolveResourcePath(endpoint)
-      const response = await http.get(`${resource}/buscar/${id}`)
+      const normalizedId = normalizeResourceId(endpoint, id)
+      const response = await http.get(`${resource}/buscar/${normalizedId}`)
       return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Error al obtener registro'))
@@ -247,8 +280,9 @@ export const apiService = {
       }
 
       const resource = resolveResourcePath(endpoint)
+      const normalizedId = normalizeResourceId(endpoint, id)
       const payload = mapDataToBackend(endpoint, data)
-      const response = await http.put(`${resource}/actualizar/${id}`, payload)
+      const response = await http.put(`${resource}/actualizar/${normalizedId}`, payload)
       return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Error al actualizar registro'))
@@ -267,7 +301,8 @@ export const apiService = {
       }
 
       const resource = resolveResourcePath(endpoint)
-      const response = await http.delete(`${resource}/eliminar/${id}`)
+      const normalizedId = normalizeResourceId(endpoint, id)
+      const response = await http.delete(`${resource}/eliminar/${normalizedId}`)
       return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Error al eliminar registro'))
