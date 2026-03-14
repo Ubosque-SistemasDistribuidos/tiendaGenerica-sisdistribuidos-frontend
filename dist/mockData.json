@@ -1,0 +1,124 @@
+{
+  "/usuarios": [
+    {
+      "id": 1,
+      "cedula": "123456789",
+      "usuario": "jperez",
+      "nombreCompleto": "Juan Pérez García",
+      "email": "juan.perez@example.com",
+      "password": "****"
+    },
+    {
+      "id": 2,
+      "cedula": "987654321",
+      "usuario": "mrodriguez",
+      "nombreCompleto": "María Rodríguez López",
+      "email": "maria.rodriguez@example.com",
+      "password": "****"
+    },
+    {
+      "id": 3,
+      "cedula": "456123789",
+      "usuario": "cgarcia",
+      "nombreCompleto": "Carlos García Martínez",
+      "email": "carlos.garcia@example.com",
+      "password": "****"
+    },
+    {
+      "id": 4,
+      "cedula": "789456123",
+      "usuario": "alopez",
+      "nombreCompleto": "Ana López Fernández",
+      "email": "ana.lopez@example.com",
+      "password": "****"
+    },
+    {
+      "id": 5,
+      "cedula": "321789456",
+      "usuario": "pmoreno",
+      "nombreCompleto": "Pedro Moreno Ruiz",
+      "email": "pedro.moreno@example.com",
+      "password": "****"
+    }
+  ],
+  "/clientes": [
+    {
+      "id": 1,
+      "cedulaCliente": "111222333",
+      "nombreCliente": "Empresa XYZ S.A.",
+      "telefonoCliente": "3001234567",
+      "emailCliente": "contacto@empresaxyz.com",
+      "direccionCliente": "Calle Principal 123, Bogotá"
+    },
+    {
+      "id": 2,
+      "cedulaCliente": "444555666",
+      "nombreCliente": "Comercial ABC Ltda",
+      "telefonoCliente": "3157894560",
+      "emailCliente": "info@comercialabc.com",
+      "direccionCliente": "Carrera 7 456, Medellín"
+    },
+    {
+      "id": 3,
+      "cedulaCliente": "777888999",
+      "nombreCliente": "Industrias DEF Ltda",
+      "telefonoCliente": "3209874563",
+      "emailCliente": "ventas@industriasdef.com",
+      "direccionCliente": "Avenida Simons 789, Cali"
+    }
+  ],
+  "/proveedores": [
+    {
+      "id": 1,
+      "nit": "123456789-1",
+      "nombreProveedor": "Distribuidora Global",
+      "telefonoProveedor": "3101234567",
+      "ciudad": "Bogotá",
+      "direccionProveedor": "Calle 80 No. 10-30"
+    },
+    {
+      "id": 2,
+      "nit": "987654321-9",
+      "nombreProveedor": "Suministros Premium",
+      "telefonoProveedor": "3157894561",
+      "ciudad": "Medellín",
+      "direccionProveedor": "Carrera 42 No. 30-15"
+    },
+    {
+      "id": 3,
+      "nit": "555666777-3",
+      "nombreProveedor": "Logística Express",
+      "telefonoProveedor": "3209874562",
+      "ciudad": "Barranquilla",
+      "direccionProveedor": "Avenida 20 No. 50-60"
+    },
+    {
+      "id": 4,
+      "nit": "111222333-5",
+      "nombreProveedor": "Fabricaciones Locales",
+      "telefonoProveedor": "3142587963",
+      "ciudad": "Cali",
+      "direccionProveedor": "Calle 5 No. 15-25"
+    }
+  ],
+  "/productos": [
+    {
+      "id": 1,
+      "codigoProducto": "PROD-001",
+      "nombreProducto": "Arroz 500g",
+      "precioCompra": 2500,
+      "ivaCompra": 0,
+      "precioVenta": 3200,
+      "nitProveedor": "123456789-1"
+    },
+    {
+      "id": 2,
+      "codigoProducto": "PROD-002",
+      "nombreProducto": "Aceite 1L",
+      "precioCompra": 8000,
+      "ivaCompra": 1520,
+      "precioVenta": 12000,
+      "nitProveedor": "987654321-9"
+    }
+  ]
+}

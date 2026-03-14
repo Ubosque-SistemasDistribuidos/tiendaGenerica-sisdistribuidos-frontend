@@ -3,17 +3,34 @@ import { mockBackend } from './mockBackend'
 
 // Usar VITE_USE_MOCK_BACKEND=true para usar datos locales
 // O VITE_USE_MOCK_BACKEND=false para usar el backend real
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_BACKEND === 'false'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_BACKEND === 'true'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8088'
+const PROVIDERS_API_URL = import.meta.env.VITE_PROVIDERS_API_URL || 'http://localhost:8091'
 const LOCAL_SALES_KEY = 'ventasFallbackLocal'
 
-const http = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  timeout: 15000
-})
+// Crear cliente HTTP con URL dinámica basada en el recurso
+const createHttpClient = (baseURL) => {
+  return axios.create({
+    baseURL,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    timeout: 15000
+  })
+}
+
+const getHttpClient = (endpoint = '') => {
+  const resource = resolveResourcePath(endpoint)
+  // Usar microservicio de proveedores si es un endpoint de proveedores
+  if (resource === '/proveedores') {
+    return createHttpClient(PROVIDERS_API_URL)
+  }
+  // Por defecto usar API principal
+  return createHttpClient(API_BASE_URL)
+}
+
+// Cliente HTTP por defecto (para compatibilidad con custom)
+const http = createHttpClient(API_BASE_URL)
 
 const normalizeEndpoint = (endpoint = '') => {
   if (!endpoint) return ''
@@ -244,7 +261,10 @@ const getErrorMessage = (error, fallback) => {
 // Log de conexión para debugging
 if (typeof window !== 'undefined') {
   console.log(`🔌 Modo: ${USE_MOCK ? '📦 MOCK (localStorage)' : '🌐 API Real'}`)
-  if (!USE_MOCK) console.log(`📍 API URL: ${API_BASE_URL}`)
+  if (!USE_MOCK) {
+    console.log(`📍 API URL Principal: ${API_BASE_URL}`)
+    console.log(`📍 API URL Proveedores: ${PROVIDERS_API_URL}`)
+  }
 }
 
 // Seleccionar backend activo
@@ -262,8 +282,9 @@ export const apiService = {
         return await backend.getAll(endpoint, params)
       }
 
+      const httpClient = getHttpClient(endpoint)
       const resource = resolveResourcePath(endpoint)
-      const response = await http.get(`${resource}/listar`, { params })
+      const response = await httpClient.get(`${resource}/listar`, { params })
       return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Error al obtener datos'))
@@ -281,9 +302,10 @@ export const apiService = {
         return await backend.getById(endpoint, id)
       }
 
+      const httpClient = getHttpClient(endpoint)
       const resource = resolveResourcePath(endpoint)
       const normalizedId = normalizeResourceId(endpoint, id)
-      const response = await http.get(`${resource}/buscar/${normalizedId}`)
+      const response = await httpClient.get(`${resource}/buscar/${normalizedId}`)
       return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Error al obtener registro'))
@@ -329,9 +351,10 @@ export const apiService = {
         return await backend.create(endpoint, data)
       }
 
+      const httpClient = getHttpClient(endpoint)
       const resource = resolveResourcePath(endpoint)
       const payload = mapDataToBackend(endpoint, data)
-      const response = await http.post(`${resource}/guardar`, payload)
+      const response = await httpClient.post(`${resource}/guardar`, payload)
       return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Error al crear registro'))
@@ -350,10 +373,11 @@ export const apiService = {
         return await backend.update(endpoint, id, data)
       }
 
+      const httpClient = getHttpClient(endpoint)
       const resource = resolveResourcePath(endpoint)
       const normalizedId = normalizeResourceId(endpoint, id)
       const payload = mapDataToBackend(endpoint, data)
-      const response = await http.put(`${resource}/actualizar/${normalizedId}`, payload)
+      const response = await httpClient.put(`${resource}/actualizar/${normalizedId}`, payload)
       return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Error al actualizar registro'))
@@ -371,9 +395,10 @@ export const apiService = {
         return await backend.delete(endpoint, id)
       }
 
+      const httpClient = getHttpClient(endpoint)
       const resource = resolveResourcePath(endpoint)
       const normalizedId = normalizeResourceId(endpoint, id)
-      const response = await http.delete(`${resource}/eliminar/${normalizedId}`)
+      const response = await httpClient.delete(`${resource}/eliminar/${normalizedId}`)
       return mapDataFromBackend(endpoint, response.data)
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Error al eliminar registro'))
@@ -449,12 +474,13 @@ export const apiService = {
         return await backend.create('/ventas', normalizedSaleData)
       }
 
+      const httpClient = getHttpClient('/ventas')
       const candidatePaths = ['/ventas/guardar', '/venta/guardar']
       let firstNon404Error = null
 
       for (const path of candidatePaths) {
         try {
-          const response = await http.post(path, normalizedSaleData)
+          const response = await httpClient.post(path, normalizedSaleData)
           return response.data
         } catch (error) {
           const status = error?.response?.status
