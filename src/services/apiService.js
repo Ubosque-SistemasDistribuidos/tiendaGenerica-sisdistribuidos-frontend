@@ -82,6 +82,77 @@ const normalizeResourceId = (endpoint = '', id) => {
   return id
 }
 
+const getFirstNonEmptyValue = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null) continue
+    if (typeof value === 'string' && value.trim() === '') continue
+    return value
+  }
+  return undefined
+}
+
+const toFiniteNumber = (value) => {
+  if (value === undefined || value === null || value === '') return undefined
+  const parsedValue = Number(value)
+  return Number.isFinite(parsedValue) ? parsedValue : undefined
+}
+
+const normalizeSalePayload = (data = {}) => {
+  if (!data || typeof data !== 'object') return data
+
+  const normalizedData = { ...data }
+
+  if (data.cliente && typeof data.cliente === 'object') {
+    const customerCedula = getFirstNonEmptyValue(data.cliente.cedula, data.cliente.cedulaCliente)
+    const normalizedCedula = toLongNumber(customerCedula)
+
+    normalizedData.cliente = { ...data.cliente }
+    // Evita enviar valores no numericos que Java serializa como null.
+    delete normalizedData.cliente.cedula
+    if (Number.isSafeInteger(normalizedCedula)) {
+      normalizedData.cliente.cedula = normalizedCedula
+    }
+  }
+
+  if (Array.isArray(data.detalle)) {
+    normalizedData.detalle = data.detalle.map((detailItem = {}) => {
+      const normalizedDetail = { ...detailItem }
+
+      const codeValue = toLongNumber(
+        getFirstNonEmptyValue(detailItem.codigoProducto, detailItem.codigo_producto, detailItem.codigo)
+      )
+      const quantityValue = toFiniteNumber(
+        getFirstNonEmptyValue(detailItem.cantidadProducto, detailItem.cantidad_producto, detailItem.cantidad)
+      )
+      const saleValue = toFiniteNumber(getFirstNonEmptyValue(detailItem.valorVenta, detailItem.valor_venta))
+      const totalValue = toFiniteNumber(getFirstNonEmptyValue(detailItem.valorTotal, detailItem.valor_total))
+
+      // Limpia campos potencialmente NaN para no serializarlos como null.
+      delete normalizedDetail.codigoProducto
+      delete normalizedDetail.cantidadProducto
+      delete normalizedDetail.valorVenta
+      delete normalizedDetail.valorTotal
+
+      if (Number.isSafeInteger(codeValue)) {
+        normalizedDetail.codigoProducto = codeValue
+      }
+      if (quantityValue !== undefined) {
+        normalizedDetail.cantidadProducto = quantityValue
+      }
+      if (saleValue !== undefined) {
+        normalizedDetail.valorVenta = saleValue
+      }
+      if (totalValue !== undefined) {
+        normalizedDetail.valorTotal = totalValue
+      }
+
+      return normalizedDetail
+    })
+  }
+
+  return normalizedData
+}
+
 const mapSearchField = (endpoint = '', searchField = '') => {
   const resource = resolveResourcePath(endpoint)
 
@@ -368,8 +439,14 @@ export const apiService = {
    */
   createSale: async (data) => {
     try {
+      const normalizedSaleData = normalizeSalePayload(data)
+       if (!normalizedSaleData.codigoVenta) {
+      normalizedSaleData.codigoVenta = Date.now()
+    } else {
+      normalizedSaleData.codigoVenta = Number(normalizedSaleData.codigoVenta)
+    }
       if (USE_MOCK) {
-        return await backend.create('/ventas', data)
+        return await backend.create('/ventas', normalizedSaleData)
       }
 
       const candidatePaths = ['/ventas/guardar', '/venta/guardar']
@@ -377,7 +454,7 @@ export const apiService = {
 
       for (const path of candidatePaths) {
         try {
-          const response = await http.post(path, data)
+          const response = await http.post(path, normalizedSaleData)
           return response.data
         } catch (error) {
           const status = error?.response?.status
@@ -393,7 +470,7 @@ export const apiService = {
         throw firstNon404Error
       }
 
-      const localSale = saveSaleLocally(data)
+      const localSale = saveSaleLocally(normalizedSaleData)
       return {
         ...localSale,
         warning: 'La venta se guardo localmente porque el endpoint de ventas no esta disponible.'
