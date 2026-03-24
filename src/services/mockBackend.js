@@ -235,6 +235,32 @@ class MockBackend {
   import(data) {
     localStorage.setItem(this.storageKey, JSON.stringify(data))
   }
+
+  // AUTH - Autenticar usuario
+  async loginUser(username, password) {
+    await this.delay()
+    const users = this.getData('/usuarios')
+    
+    if (!Array.isArray(users)) {
+      throw new Error('Tabla de usuarios no disponible')
+    }
+    
+    const user = users.find(
+      u => u.usuario && u.usuario.toLowerCase() === username.toLowerCase()
+    )
+    
+    if (!user) {
+      throw new Error('Usuario no encontrado')
+    }
+    
+    if (user.password !== password) {
+      throw new Error('Contraseña incorrecta')
+    }
+    
+    // Retornar usuario sin incluir contraseña
+    const { password: _, ...userWithoutPassword } = user
+    return userWithoutPassword
+  }
 }
 
 export const mockBackend = new MockBackend()

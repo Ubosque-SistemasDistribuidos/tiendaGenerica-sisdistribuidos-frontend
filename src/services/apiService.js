@@ -270,6 +270,36 @@ if (typeof window !== 'undefined') {
 // Seleccionar backend activo
 const backend = USE_MOCK ? mockBackend : null
 
+/**
+ * Autenticar usuario contra tabla de usuarios
+ * @param {string} username - Nombre de usuario
+ * @param {string} password - Contraseña
+ * @returns {Promise<{usuario: string, id: number, nombreCompleto: string, email: string, cedula: string}>} Usuario autenticado
+ */
+const loginUser = async (username, password) => {
+  try {
+    if (!username || !password) {
+      throw new Error('Usuario y contraseña son requeridos')
+    }
+
+    if (USE_MOCK) {
+      // Usar mock backend
+      return await backend.loginUser(username, password)
+    } else {
+      // Usar backend real
+      const httpClient = createHttpClient(API_BASE_URL)
+      const response = await httpClient.post('/usuarios/autenticar', {
+        usuario: username,
+        password: password
+      })
+      return response.data
+    }
+  } catch (error) {
+    const message = getErrorMessage(error, 'Error en autenticación')
+    throw new Error(message)
+  }
+}
+
 export const apiService = {
   /**
    * Obtener todos los registros
@@ -428,6 +458,13 @@ export const apiService = {
       throw new Error(getErrorMessage(error, 'Error al crear registros masivos'))
     }
   },
+
+  /**
+   * Autenticar usuario
+   * @param {string} username - Nombre de usuario
+   * @param {string} password - Contraseña
+   */
+  loginUser,
 
   /**
    * Realizar una consulta personalizada

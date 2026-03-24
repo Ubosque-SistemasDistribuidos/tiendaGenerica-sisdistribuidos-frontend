@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { apiService } from '../services/apiService'
+import Reports from './Reports'
 
 export default function Menu({ user, onLogout }) {
   const [view, setView] = useState('inicio')
@@ -534,8 +535,12 @@ export default function Menu({ user, onLogout }) {
 
     const { subtotal, iva, totalConIva } = calcularTotalesVenta()
     const payload = {
+      usuario: {
+        cedula: user?.cedula
+      },
       cliente: {
-        cedula: ventaCliente?.cedulaCliente || ventaCliente?.cedula
+        cedula: ventaCliente?.cedulaCliente || ventaCliente?.cedula,
+        nombreCliente: ventaCliente?.nombreCliente || ventaCliente?.nombre || 'Sin nombre'
       },
       detalle: filasValidas.map((fila) => ({
         codigoProducto: Number(fila.codigo),
@@ -1393,6 +1398,8 @@ export default function Menu({ user, onLogout }) {
           </div>
         )
       }
+      case 'reportes':
+        return <Reports />
       default:
         return (
           <div>
@@ -1416,6 +1423,7 @@ export default function Menu({ user, onLogout }) {
         <button onClick={() => setView('proveedores')}>Gestión de proveedores</button>
         <button onClick={() => setView('productos')}>Gestión de productos</button>
         <button onClick={() => setView('ventas')}>Ventas</button>
+        <button onClick={() => setView('reportes')}>Reportes</button>
         <button className="logout" onClick={onLogout}>Cerrar sesión</button>
       </aside>
       <main className="content">{renderContent()}</main>

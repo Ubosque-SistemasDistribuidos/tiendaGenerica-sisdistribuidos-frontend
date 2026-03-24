@@ -6,7 +6,7 @@
       "usuario": "jperez",
       "nombreCompleto": "Juan Pérez García",
       "email": "juan.perez@example.com",
-      "password": "****"
+      "password": "jperez123"
     },
     {
       "id": 2,
@@ -14,7 +14,7 @@
       "usuario": "mrodriguez",
       "nombreCompleto": "María Rodríguez López",
       "email": "maria.rodriguez@example.com",
-      "password": "****"
+      "password": "mrodriguez123"
     },
     {
       "id": 3,
@@ -22,7 +22,7 @@
       "usuario": "cgarcia",
       "nombreCompleto": "Carlos García Martínez",
       "email": "carlos.garcia@example.com",
-      "password": "****"
+      "password": "cgarcia123"
     },
     {
       "id": 4,
@@ -30,7 +30,7 @@
       "usuario": "alopez",
       "nombreCompleto": "Ana López Fernández",
       "email": "ana.lopez@example.com",
-      "password": "****"
+      "password": "alopez123"
     },
     {
       "id": 5,
@@ -38,7 +38,7 @@
       "usuario": "pmoreno",
       "nombreCompleto": "Pedro Moreno Ruiz",
       "email": "pedro.moreno@example.com",
-      "password": "****"
+      "password": "pmoreno123"
     }
   ],
   "/clientes": [
