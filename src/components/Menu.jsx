@@ -351,11 +351,20 @@ export default function Menu({ user, onLogout }) {
     }
 
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-    const requiredFields = ['codigo_producto', 'nombre_producto', 'nitproveedor', 'precio_compra', 'ivacompra', 'precio_venta']
+    const requiredFields = ['codigo_producto', 'nombre_producto', 'nit_proveedor', 'precio_compra', 'iva_compra', 'precio_venta']
     const missingFields = requiredFields.filter(f => !headers.includes(f))
 
     if (missingFields.length > 0) {
       throw new Error(`Faltan columnas requeridas en el CSV: ${missingFields.join(', ')}`)
+    }
+
+    const fieldMap = {
+      'codigo_producto': 'codigoProducto',
+      'nombre_producto': 'nombreProducto',
+      'nit_proveedor': 'nitProveedor',
+      'precio_compra': 'precioCompra',
+      'iva_compra': 'ivaCompra',
+      'precio_venta': 'precioVenta'
     }
 
     const products = []
@@ -367,18 +376,24 @@ export default function Menu({ user, onLogout }) {
       const product = {}
       headers.forEach((header, idx) => {
         const val = values[idx]
-        // Mapear de snake_case a camelCase
+        // Mapear de snake_case a camelCase según la base de datos
         const fieldMap = {
           'codigo_producto': 'codigoProducto',
           'nombre_producto': 'nombreProducto',
-          'nitproveedor': 'nitProveedor',
+          'nit_proveedor': 'nitProveedor',
           'precio_compra': 'precioCompra',
-          'ivacompra': 'ivaCompra',
+          'iva_compra': 'ivaCompra',
           'precio_venta': 'precioVenta'
         }
         const camelCaseField = fieldMap[header] || header
         if (['precioCompra', 'ivaCompra', 'precioVenta'].includes(camelCaseField)) {
           product[camelCaseField] = parseFloat(val) || 0
+        } else if (camelCaseField === 'nitProveedor') {
+          // Convertir NIT a entero, removiendo separadores de miles/decimales
+          const cleanNit = val.replace(/[.,\s]/g, '')
+          product[camelCaseField] = parseInt(cleanNit, 10) || 0
+        } else if (camelCaseField === 'codigoProducto') {
+          product[camelCaseField] = parseInt(val, 10) || 0
         } else {
           product[camelCaseField] = val
         }
@@ -527,6 +542,11 @@ export default function Menu({ user, onLogout }) {
       return
     }
 
+    if (!user || !user.cedula) {
+      setVentaError('Error: No se encontró la cédula del usuario. Inicie sesión nuevamente.')
+      return
+    }
+
     const filasValidas = ventaFilas.filter((fila) => Number(fila.cantidad) > 0 && Number(fila.precio) > 0)
     if (filasValidas.length === 0) {
       setVentaError('Debe agregar al menos un producto con cantidad y precio validos.')
@@ -535,9 +555,7 @@ export default function Menu({ user, onLogout }) {
 
     const { subtotal, iva, totalConIva } = calcularTotalesVenta()
     const payload = {
-      usuario: {
-        cedula: user?.cedula
-      },
+      cedulaUsuario: user.cedula || '',
       cliente: {
         cedula: ventaCliente?.cedulaCliente || ventaCliente?.cedula,
         nombreCliente: ventaCliente?.nombreCliente || ventaCliente?.nombre || 'Sin nombre'
@@ -1199,7 +1217,7 @@ export default function Menu({ user, onLogout }) {
 
               <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#e8f4f8', borderRadius: '6px', fontSize: '12px', color: '#555' }}>
                 <strong>Formato esperado del CSV:</strong><br />
-                El archivo debe incluir las columnas en este orden: <code>codigo_producto, nombre_producto, nitproveedor, precio_compra, ivacompra, precio_venta</code>
+                El archivo debe incluir las columnas en este orden: <code>codigo_producto, nombre_producto, nit_proveedor, precio_compra, iva_compra, precio_venta</code>
               </div>
             </div>
 

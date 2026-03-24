@@ -25,22 +25,44 @@ class MockBackend {
   }
 
   normalizeRecord(endpoint, data = {}) {
-    if (endpoint !== '/clientes') {
+    // Normalizar cédulas en clientes
+    if (endpoint === '/clientes') {
+      if ('cedula' in data) {
+        return {
+          ...data,
+          cedula: this.toLongNumber(data.cedula)
+        }
+      }
+
+      if ('cedulaCliente' in data) {
+        return {
+          ...data,
+          cedulaCliente: this.toLongNumber(data.cedulaCliente)
+        }
+      }
+
       return data
     }
 
-    if ('cedula' in data) {
-      return {
-        ...data,
-        cedula: this.toLongNumber(data.cedula)
-      }
-    }
+    // Normalizar cédulas en ventas (usuario y cliente)
+    if (endpoint === '/ventas') {
+      const normalized = { ...data }
 
-    if ('cedulaCliente' in data) {
-      return {
-        ...data,
-        cedulaCliente: this.toLongNumber(data.cedulaCliente)
+      if (data.usuario && typeof data.usuario === 'object') {
+        normalized.usuario = { ...data.usuario }
+        if ('cedula' in data.usuario) {
+          normalized.usuario.cedula = this.toLongNumber(data.usuario.cedula)
+        }
       }
+
+      if (data.cliente && typeof data.cliente === 'object') {
+        normalized.cliente = { ...data.cliente }
+        if ('cedula' in data.cliente) {
+          normalized.cliente.cedula = this.toLongNumber(data.cliente.cedula)
+        }
+      }
+
+      return normalized
     }
 
     return data

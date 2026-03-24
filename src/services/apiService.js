@@ -3,9 +3,19 @@ import { mockBackend } from './mockBackend'
 
 // Usar VITE_USE_MOCK_BACKEND=true para usar datos locales
 // O VITE_USE_MOCK_BACKEND=false para usar el backend real
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_BACKEND === 'true'
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8088'
-const PROVIDERS_API_URL = import.meta.env.VITE_PROVIDERS_API_URL || 'http://localhost:8091'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_BACKEND === 'false'
+
+// URLs de Microservicios por Servicio
+const MICROSERVICES_URLS = {
+  backend: import.meta.env.VITE_BACKEND_URL || 'https://cautious-space-waffle-5gqx67xjvw9v24qp6-8088.app.github.dev/',
+  cliente: import.meta.env.VITE_CLIENTE_URL || 'https://cautious-space-waffle-5gqx67xjvw9v24qp6-8089.app.github.dev/',
+  usuario: import.meta.env.VITE_USUARIO_URL || 'https://cautious-space-waffle-5gqx67xjvw9v24qp6-8090.app.github.dev/',
+  proveedor: import.meta.env.VITE_PROVEEDOR_URL || 'https://cautious-space-waffle-5gqx67xjvw9v24qp6-8091.app.github.dev/',
+  producto: import.meta.env.VITE_PRODUCTO_URL || 'https://cautious-space-waffle-5gqx67xjvw9v24qp6-8092.app.github.dev/',
+  venta: import.meta.env.VITE_VENTA_URL || 'https://cautious-space-waffle-5gqx67xjvw9v24qp6-8093.app.github.dev/',
+  detalleVenta: import.meta.env.VITE_DETALLE_VENTA_URL || 'https://cautious-space-waffle-5gqx67xjvw9v24qp6-8094.app.github.dev/'
+}
+
 const LOCAL_SALES_KEY = 'ventasFallbackLocal'
 
 // Crear cliente HTTP con URL dinámica basada en el recurso
@@ -21,16 +31,29 @@ const createHttpClient = (baseURL) => {
 
 const getHttpClient = (endpoint = '') => {
   const resource = resolveResourcePath(endpoint)
-  // Usar microservicio de proveedores si es un endpoint de proveedores
-  if (resource === '/proveedores') {
-    return createHttpClient(PROVIDERS_API_URL)
+  
+  // Mapeo de recursos a microservicios
+  const serviceMap = {
+    '/cliente': MICROSERVICES_URLS.cliente,
+    '/clientes': MICROSERVICES_URLS.cliente,
+    '/usuarios': MICROSERVICES_URLS.usuario,
+    '/usuario': MICROSERVICES_URLS.usuario,
+    '/proveedores': MICROSERVICES_URLS.proveedor,
+    '/proveedor': MICROSERVICES_URLS.proveedor,
+    '/productos': MICROSERVICES_URLS.producto,
+    '/producto': MICROSERVICES_URLS.producto,
+    '/ventas': MICROSERVICES_URLS.venta,
+    '/venta': MICROSERVICES_URLS.venta,
+    '/detalleVenta': MICROSERVICES_URLS.detalleVenta,
+    '/detalle-venta': MICROSERVICES_URLS.detalleVenta
   }
-  // Por defecto usar API principal
-  return createHttpClient(API_BASE_URL)
+  
+  const baseURL = serviceMap[resource] || MICROSERVICES_URLS.backend
+  return createHttpClient(baseURL)
 }
 
 // Cliente HTTP por defecto (para compatibilidad con custom)
-const http = createHttpClient(API_BASE_URL)
+const http = createHttpClient(MICROSERVICES_URLS.backend)
 
 const normalizeEndpoint = (endpoint = '') => {
   if (!endpoint) return ''
@@ -118,6 +141,19 @@ const normalizeSalePayload = (data = {}) => {
   if (!data || typeof data !== 'object') return data
 
   const normalizedData = { ...data }
+
+  // Normalizar usuario (agregar cédula como número)
+  if (data.usuario && typeof data.usuario === 'object') {
+    const userCedula = getFirstNonEmptyValue(data.usuario.cedula)
+    const normalizedUserCedula = toLongNumber(userCedula)
+
+    normalizedData.usuario = { ...data.usuario }
+    // Evita enviar valores no numéricos que Java serializa como null
+    delete normalizedData.usuario.cedula
+    if (Number.isSafeInteger(normalizedUserCedula)) {
+      normalizedData.usuario.cedula = normalizedUserCedula
+    }
+  }
 
   if (data.cliente && typeof data.cliente === 'object') {
     const customerCedula = getFirstNonEmptyValue(data.cliente.cedula, data.cliente.cedulaCliente)
@@ -260,10 +296,16 @@ const getErrorMessage = (error, fallback) => {
 
 // Log de conexión para debugging
 if (typeof window !== 'undefined') {
-  console.log(`🔌 Modo: ${USE_MOCK ? '📦 MOCK (localStorage)' : '🌐 API Real'}`)
+  console.log(`🔌 Modo: ${USE_MOCK ? '📦 MOCK (localStorage)' : '🌐 API Real (Microservicios)'}`)
   if (!USE_MOCK) {
-    console.log(`📍 API URL Principal: ${API_BASE_URL}`)
-    console.log(`📍 API URL Proveedores: ${PROVIDERS_API_URL}`)
+    console.log('📍 URLs de Microservicios:')
+    console.log(`   Backend: ${MICROSERVICES_URLS.backend}`)
+    console.log(`   Cliente: ${MICROSERVICES_URLS.cliente}`)
+    console.log(`   Usuario: ${MICROSERVICES_URLS.usuario}`)
+    console.log(`   Proveedor: ${MICROSERVICES_URLS.proveedor}`)
+    console.log(`   Producto: ${MICROSERVICES_URLS.producto}`)
+    console.log(`   Venta: ${MICROSERVICES_URLS.venta}`)
+    console.log(`   Detalle Venta: ${MICROSERVICES_URLS.detalleVenta}`)
   }
 }
 
@@ -286,13 +328,23 @@ const loginUser = async (username, password) => {
       // Usar mock backend
       return await backend.loginUser(username, password)
     } else {
-      // Usar backend real
-      const httpClient = createHttpClient(API_BASE_URL)
-      const response = await httpClient.post('/usuarios/autenticar', {
-        usuario: username,
-        password: password
-      })
-      return response.data
+      // Usar backend real - intentar primero el servicio de usuarios, luego el backend principal
+      try {
+        const httpClientUsuario = createHttpClient(MICROSERVICES_URLS.usuario)
+        const response = await httpClientUsuario.post('/usuarios/login', {
+          usuario: username,
+          password: password
+        })
+        return response.data
+      } catch (userServiceError) {
+        // Si falla, intentar con el backend principal
+        const httpClientBackend = createHttpClient(MICROSERVICES_URLS.backend)
+        const response = await httpClientBackend.post('/usuarios/login', {
+          usuario: username,
+          password: password
+        })
+        return response.data
+      }
     }
   } catch (error) {
     const message = getErrorMessage(error, 'Error en autenticación')
@@ -502,11 +554,14 @@ export const apiService = {
   createSale: async (data) => {
     try {
       const normalizedSaleData = normalizeSalePayload(data)
-       if (!normalizedSaleData.codigoVenta) {
-      normalizedSaleData.codigoVenta = Date.now()
-    } else {
-      normalizedSaleData.codigoVenta = Number(normalizedSaleData.codigoVenta)
-    }
+      if (!normalizedSaleData.codigoVenta) {
+        normalizedSaleData.codigoVenta = Date.now()
+      } else {
+        normalizedSaleData.codigoVenta = Number(normalizedSaleData.codigoVenta)
+      }
+      
+      console.log('🔍 Venta normalizada antes de enviar:', JSON.stringify(normalizedSaleData, null, 2))
+      
       if (USE_MOCK) {
         return await backend.create('/ventas', normalizedSaleData)
       }
@@ -517,7 +572,9 @@ export const apiService = {
 
       for (const path of candidatePaths) {
         try {
+          console.log('📡 Enviando a:', path, normalizedSaleData)
           const response = await httpClient.post(path, normalizedSaleData)
+          console.log('✅ Respuesta del backend:', response.data)
           return response.data
         } catch (error) {
           const status = error?.response?.status
